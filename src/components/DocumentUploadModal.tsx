@@ -1,0 +1,133 @@
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import { FileUploader } from './FileUploader';
+import { toast } from 'sonner@2.0.3';
+
+interface DocumentUploadModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function DocumentUploadModal({ open, onOpenChange }: DocumentUploadModalProps) {
+  const [formData, setFormData] = useState({
+    title: '',
+    tag: '',
+    summary: ''
+  });
+  const [files, setFiles] = useState<File[]>([]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Show success toast
+    toast.success('Document uploaded successfully!', {
+      description: `${formData.title} has been added to your team's knowledge base.`
+    });
+    
+    // Reset form
+    setFormData({ title: '', tag: '', summary: '' });
+    setFiles([]);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Upload Document</DialogTitle>
+          <DialogDescription>
+            Add a new document to your team's knowledge base. The AI will use this to answer questions.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FileUploader onFilesSelect={setFiles} maxFiles={1} />
+
+          <div className="space-y-2">
+            <Label htmlFor="title">Document Title</Label>
+            <Input
+              id="title"
+              type="text"
+              placeholder="e.g., API Authentication Guide"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="rounded-xl"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tag">Document Tag</Label>
+            <Select 
+              value={formData.tag} 
+              onValueChange={(value) => setFormData({ ...formData, tag: value })}
+              required
+            >
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="Select a tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="design-doc">Design Doc</SelectItem>
+                <SelectItem value="api-spec">API Spec</SelectItem>
+                <SelectItem value="runbook">Runbook</SelectItem>
+                <SelectItem value="guide">Guide</SelectItem>
+                <SelectItem value="reference">Reference</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground">
+              Helps organize and categorize your documents
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="summary">Summary (Optional)</Label>
+            <Textarea
+              id="summary"
+              placeholder="Brief overview of what this document covers..."
+              value={formData.summary}
+              onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+              className="rounded-xl min-h-[80px]"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 rounded-xl bg-primary hover:bg-primary/90"
+              disabled={!files.length || !formData.title || !formData.tag}
+            >
+              Upload Document
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

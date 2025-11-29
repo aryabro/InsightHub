@@ -1,0 +1,281 @@
+import React, { useState } from 'react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Card } from './ui/card';
+import { Badge } from './ui/badge';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import { DocumentUploadModal } from './DocumentUploadModal';
+import { ArrowLeft, ArrowRight, Mail, X, FileText, CheckCircle, Send } from 'lucide-react';
+
+interface TeamSetupPageProps {
+  onNavigate: (page: string) => void;
+}
+
+interface Invite {
+  email: string;
+  role: string;
+  note: string;
+}
+
+export function TeamSetupPage({ onNavigate }: TeamSetupPageProps) {
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [inviteForm, setInviteForm] = useState({
+    email: '',
+    role: 'developer',
+    note: ''
+  });
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [emailError, setEmailError] = useState('');
+
+  const handleAddInvite = () => {
+    if (inviteForm.email) {
+      // Email validation regex
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(inviteForm.email)) {
+        setEmailError('Please enter a valid email address');
+        return;
+      }
+      setInvites([...invites, { ...inviteForm }]);
+      setInviteForm({ email: '', role: 'developer', note: '' });
+      setEmailError('');
+    }
+  };
+
+  const handleRemoveInvite = (index: number) => {
+    setInvites(invites.filter((_, i) => i !== index));
+  };
+
+  const handleFinish = () => {
+    onNavigate('app');
+  };
+
+  const handleUploadComplete = (fileName: string) => {
+    setUploadedFiles([...uploadedFiles, fileName]);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
+      <div className="max-w-6xl mx-auto p-8">
+        <Button
+          variant="ghost"
+          className="mb-8 gap-2 rounded-xl text-slate-700 hover:text-slate-900"
+          onClick={() => onNavigate('create-team')}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </Button>
+
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-success text-white flex items-center justify-center shadow-lg">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1 h-2 bg-primary rounded shadow-sm"></div>
+            <div className="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center shadow-lg">
+              2
+            </div>
+          </div>
+          <h1 className="mb-3">Team Setup</h1>
+          <p className="text-muted-foreground text-lg">
+            Invite team members and upload your initial documents
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Invite Members Card */}
+          <Card className="p-8 rounded-3xl border-border shadow-xl bg-card/50 backdrop-blur-sm">
+            <h3 className="mb-6">Invite Team Members</h3>
+            
+            <div className="space-y-4 mb-6">
+              <div className="space-y-2">
+                <Label htmlFor="inviteEmail">Email Address</Label>
+                <Input
+                  id="inviteEmail"
+                  type="email"
+                  placeholder="teammate@company.com"
+                  value={inviteForm.email}
+                  onChange={(e) => {
+                    setInviteForm({ ...inviteForm, email: e.target.value });
+                    if (emailError) setEmailError('');
+                  }}
+                  className={`rounded-xl h-12 ${emailError ? 'border-red-500' : ''}`}
+                />
+                {emailError && (
+                  <p className="text-red-500 text-sm mt-1">{emailError}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="inviteRole">Role</Label>
+                <Select 
+                  value={inviteForm.role} 
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}
+                >
+                  <SelectTrigger className="rounded-xl h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="developer">Developer</SelectItem>
+                    <SelectItem value="designer">Designer</SelectItem>
+                    <SelectItem value="product">Product Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="inviteNote">Optional Note</Label>
+                <Textarea
+                  id="inviteNote"
+                  placeholder="Welcome to the team!"
+                  value={inviteForm.note}
+                  onChange={(e) => setInviteForm({ ...inviteForm, note: e.target.value })}
+                  className="rounded-xl"
+                  rows={2}
+                />
+              </div>
+
+              <Button
+                onClick={handleAddInvite}
+                className="w-full rounded-xl gap-2 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 h-12"
+                disabled={!inviteForm.email}
+              >
+                <Send className="w-4 h-4" />
+                Send Invite
+              </Button>
+            </div>
+
+            {invites.length > 0 && (
+              <div className="space-y-2">
+                <Label>Pending Invites ({invites.length})</Label>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {invites.map((invite, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-4 bg-secondary/50 rounded-xl border border-border/50"
+                    >
+                      <Mail className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate mb-2">{invite.email}</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="rounded-lg">
+                            {invite.role}
+                          </Badge>
+                          {invite.note && (
+                            <span className="text-muted-foreground truncate text-sm">
+                              {invite.note}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveInvite(index)}
+                        className="flex-shrink-0 rounded-lg"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {invites.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground bg-secondary/30 rounded-xl border border-border/50">
+                <Mail className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No invites yet</p>
+                <p className="text-sm">Add team members above</p>
+              </div>
+            )}
+          </Card>
+
+          {/* Upload Documents Card */}
+          <Card className="p-8 rounded-3xl border-border shadow-xl bg-card/50 backdrop-blur-sm">
+            <h3 className="mb-6">Upload Initial Documents</h3>
+            
+            <div className="space-y-4">
+              <Button
+                onClick={() => setShowUploadModal(true)}
+                variant="outline"
+                className="w-full rounded-xl gap-2 h-24 border-2 border-dashed hover:border-primary/50 hover:bg-primary/5"
+              >
+                <FileText className="w-6 h-6 text-primary" />
+                <div className="text-left">
+                  <p>Click to Upload Documents</p>
+                  <p className="text-muted-foreground text-sm">PDF, Markdown, or text files</p>
+                </div>
+              </Button>
+
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Uploaded Documents ({uploadedFiles.length})</Label>
+                  <div className="space-y-2">
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-4 bg-secondary/50 rounded-xl border border-border/50"
+                      >
+                        <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                        <div className="flex-1">
+                          <p>{file}</p>
+                        </div>
+                        <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {uploadedFiles.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground bg-secondary/30 rounded-xl border border-border/50">
+                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No documents uploaded</p>
+                  <p className="text-sm">You can add them later</p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="rounded-xl h-12"
+            onClick={handleFinish}
+          >
+            Skip for Now
+          </Button>
+          <Button
+            className="flex-1 rounded-xl bg-primary hover:bg-primary/90 gap-2 shadow-lg shadow-primary/25 h-12"
+            onClick={handleFinish}
+          >
+            Go to Team Dashboard
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <DocumentUploadModal 
+        open={showUploadModal} 
+        onOpenChange={(open) => {
+          setShowUploadModal(open);
+          if (!open) {
+            // Simulate upload complete
+            handleUploadComplete('Sample Document.pdf');
+          }
+        }}
+      />
+    </div>
+  );
+}
