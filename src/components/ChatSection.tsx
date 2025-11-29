@@ -3,32 +3,20 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { MessageSquare, Send, Sparkles, User, Bot, Lock, Info } from 'lucide-react';
+import { MessageSquare, Send, Sparkles, User, Bot, Lock, Info, Loader2 } from 'lucide-react';
 
 export function ChatSection() {
   const [messages, setMessages] = useState([
     {
       id: 1,
       type: 'bot',
-      content: "Hello! I'm your AI assistant. I can help you find documents, answer questions about your team, and provide insights from your knowledge base.",
-      timestamp: '10:30 AM'
-    },
-    {
-      id: 2,
-      type: 'user',
-      content: "What's our Q4 product roadmap?",
-      timestamp: '10:31 AM'
-    },
-    {
-      id: 3,
-      type: 'bot',
-      content: "Based on the Q4 Product Roadmap document by Sarah Chen, here are the key initiatives:\n\n1. Launch of API v2.1 with enhanced security\n2. Mobile app redesign\n3. Integration with third-party tools\n4. Performance optimization\n\nWould you like me to provide more details on any of these items?",
-      timestamp: '10:31 AM',
-      source: 'Q4 Product Roadmap'
+      content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything!",
+      timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     },
   ]);
 
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const quickPrompts = [
     "Show me the design system guidelines",
@@ -37,8 +25,8 @@ export function ChatSection() {
     "Summarize today's standup notes"
   ];
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
     
     const userMessage = {
       id: messages.length + 1,
@@ -47,20 +35,65 @@ export function ChatSection() {
       timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     };
     
-    setMessages([...messages, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue('');
+    setIsLoading(true);
     
-    // Simulate AI response after a short delay
-    setTimeout(() => {
-      const aiResponse = {
+    try {
+      // Call the backend API
+      // Only send actual user/bot messages, exclude the greeting
+      const chatHistory = messages.slice(1).filter(msg => msg.content && msg.content.trim());
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          history: chatHistory
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from AI');
+      }
+
+      const data = await response.json();
+      
+      // Only add the response if it's not empty
+      if (data.response && data.response.trim()) {
+        const aiResponse = {
+          id: messages.length + 2,
+          type: 'bot',
+          content: data.response,
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        };
+        
+        setMessages(prev => [...prev, aiResponse]);
+      } else {
+        // If blank response, show error message instead
+        const errorMessage = {
+          id: messages.length + 2,
+          type: 'bot',
+          content: "I received an empty response. Please try rephrasing your question.",
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    } catch (error) {
+      console.error('Error calling chat API:', error);
+      const errorMessage = {
         id: messages.length + 2,
         type: 'bot',
-        content: "I understand your question. Based on the documents in your team's knowledge base, I can help you with that. However, this is a demo response. In a production environment, I would analyze your uploaded documents and provide specific, cited answers.",
+        content: "I'm sorry, I encountered an error while processing your request. Please make sure the backend server is running and try again.",
         timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-        source: 'Team Knowledge Base'
       };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1000);
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -139,6 +172,21 @@ export function ChatSection() {
                     </div>
                   </div>
                 ))}
+                {isLoading && (
+                  <div className="flex gap-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md bg-gradient-to-br from-primary to-accent">
+                      <Bot className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="max-w-[85%] rounded-2xl p-5 shadow-sm bg-gradient-to-br from-slate-50 to-white border border-slate-200">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                          <p className="text-slate-600">Thinking...</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Input */}
@@ -154,9 +202,14 @@ export function ChatSection() {
                   <Button 
                     onClick={handleSend}
                     size="icon"
-                    className="rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/20 h-12 w-12"
+                    disabled={isLoading}
+                    className="rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/20 h-12 w-12 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-5 h-5" />
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -191,7 +244,7 @@ export function ChatSection() {
               <div>
                 <h4 className="mb-2">How it works</h4>
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  The AI searches through your team's uploaded documents to provide accurate, cited answers to your questions.
+                  Powered by Google Gemini AI. Ask questions, get code help, brainstorm ideas, or have a conversation!
                 </p>
               </div>
             </div>
