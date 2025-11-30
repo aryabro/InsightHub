@@ -63,7 +63,9 @@ export function FileUploader({ onFilesSelect, maxFiles = 5, acceptedTypes = "*" 
           <span className="text-primary">Click to upload</span> or drag and drop
         </p>
         <p className="text-muted-foreground">
-          Maximum {maxFiles} files
+          {acceptedTypes === "application/pdf,.pdf" || acceptedTypes === "application/pdf" 
+            ? "PDF files only" 
+            : `Maximum ${maxFiles} files`}
         </p>
         <input
           ref={fileInputRef}

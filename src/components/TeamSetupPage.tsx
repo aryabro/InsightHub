@@ -14,9 +14,12 @@ import {
 } from './ui/select';
 import { DocumentUploadModal } from './DocumentUploadModal';
 import { ArrowLeft, ArrowRight, Mail, X, FileText, CheckCircle, Send } from 'lucide-react';
+import { addTeamMembers } from '../api/teams';
 
 interface TeamSetupPageProps {
   onNavigate: (page: string) => void;
+  teamDraft: any | null;
+  onTeamCreated: (team: any) => void;
 }
 
 interface Invite {
@@ -25,7 +28,9 @@ interface Invite {
   note: string;
 }
 
-export function TeamSetupPage({ onNavigate }: TeamSetupPageProps) {
+import { createTeam } from '../api/teams';
+
+export function TeamSetupPage({ onNavigate, teamDraft, onTeamCreated }: TeamSetupPageProps) {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [inviteForm, setInviteForm] = useState({
     email: '',
@@ -35,6 +40,8 @@ export function TeamSetupPage({ onNavigate }: TeamSetupPageProps) {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleAddInvite = () => {
     if (inviteForm.email) {
@@ -54,8 +61,57 @@ export function TeamSetupPage({ onNavigate }: TeamSetupPageProps) {
     setInvites(invites.filter((_, i) => i !== index));
   };
 
-  const handleFinish = () => {
-    onNavigate('app');
+  const handleFinish = async () => {
+    // Ensure we have team data from previous step
+    if (!teamDraft) {
+      onNavigate('create-team');
+      return;
+    }
+
+    setError('');
+
+    try {
+      setIsSubmitting(true);
+
+      const payload = {
+        name: teamDraft.teamName,
+        description: teamDraft.description,
+        mission: teamDraft.teamMission,
+        standupTime: teamDraft.standupTime,
+        timezone: teamDraft.timezone,
+        isPrivate: teamDraft.isPrivate,
+      };
+
+      const data = await createTeam(payload);
+      const teamId = data?.team?.id;
+      let memberCount = 1;
+
+      // Add members: only existing users in DB will be attached
+      if (teamId && invites.length > 0) {
+        const emails = invites.map((i) => i.email);
+        const membersResult = await addTeamMembers(teamId, emails);
+        if (membersResult?.added?.length) {
+          memberCount += membersResult.added.length;
+        }
+      }
+
+      // Note: Documents uploaded during team setup are just placeholders
+      // Users should upload actual documents through the DocumentUploadModal after team creation
+      // Skipping document upload here since we need actual File objects, not just names
+
+      if (data?.team) {
+        onTeamCreated({
+          ...data.team,
+          memberCount
+        });
+      }
+
+      onNavigate('app');
+    } catch (err: any) {
+      setError(err.message || 'Unable to create team. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUploadComplete = (fileName: string) => {
@@ -257,13 +313,17 @@ export function TeamSetupPage({ onNavigate }: TeamSetupPageProps) {
             Skip for Now
           </Button>
           <Button
-            className="flex-1 rounded-xl bg-primary hover:bg-primary/90 gap-2 shadow-lg shadow-primary/25 h-12"
+            className="flex-1 rounded-xl bg-primary hover:bg-primary/90 gap-2 shadow-lg shadow-primary/25 h-12 disabled:opacity-60"
             onClick={handleFinish}
+            disabled={isSubmitting}
           >
             Go to Team Dashboard
             <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
+        {error && (
+          <p className="text-red-500 text-sm mt-4">{error}</p>
+        )}
       </div>
 
       <DocumentUploadModal 

@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from './ui/select';
 import { ArrowLeft, Brain } from 'lucide-react';
+import { signup, storeAuth } from '../api/auth';
 
 interface SignupPageProps {
   onNavigate: (page: string) => void;
@@ -32,7 +33,10 @@ export function SignupPage({ onNavigate, onSignup }: SignupPageProps) {
     confirmPassword: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate password length
@@ -47,9 +51,31 @@ export function SignupPage({ onNavigate, onSignup }: SignupPageProps) {
       return;
     }
     
-    // Clear errors and proceed
+    // Clear errors and proceed with API call
     setErrors({ password: '', confirmPassword: '' });
-    onSignup();
+    setFormError('');
+
+    try {
+      setIsSubmitting(true);
+      const data = await signup({
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        role: formData.role || undefined,
+        timezone: formData.timezone || undefined,
+        password: formData.password
+      });
+
+      if (data?.token && data?.user) {
+        storeAuth(data.token, data.user);
+      }
+
+      onSignup();
+    } catch (err: any) {
+      setFormError(err.message || 'Unable to create account. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -211,12 +237,17 @@ export function SignupPage({ onNavigate, onSignup }: SignupPageProps) {
               </div>
             </div>
 
+            {formError && (
+              <p className="text-red-500 text-sm mt-1">{formError}</p>
+            )}
+
             <Button
               type="submit"
-              className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/30 h-12 mt-6"
+              className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/30 h-12 mt-6 disabled:opacity-60"
               size="lg"
+              disabled={isSubmitting}
             >
-              Create Account
+              {isSubmitting ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -25,61 +25,192 @@ import {
   Clock,
   Save,
   X,
-  Send,
-  BookOpen
+  Send
 } from 'lucide-react';
+import { fetchTeam, updateTeam, addTeamMembers } from '../api/teams';
+import { toast } from 'sonner@2.0.3';
 
 interface AboutPageProps {
   onNavigateToMembers?: () => void;
+  teamId?: string;
 }
 
-export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
+export function AboutPage({ onNavigateToMembers, teamId }: AboutPageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [teamInfo, setTeamInfo] = useState({
-    name: 'Mobile App Team',
-    description: 'Building iOS and Android applications for customer-facing products. Our mission is to deliver exceptional mobile experiences that delight users and drive engagement across all platforms.',
-    contactPoints: {
-      slack: '#mobile-team',
-      email: 'mobile-team@company.com'
-    },
-    standupTime: '10:00 AM',
-    timezone: 'PST',
-    memberCount: 6,
-    created: 'January 2024',
-    visibility: 'Private'
+  const [loading, setLoading] = useState(true);
+  const [teamInfo, setTeamInfo] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    standupTime: '',
+    timezone: '',
+    slackChannel: '',
+    email: '',
+    isPrivate: true
   });
-
-  const [editForm, setEditForm] = useState(teamInfo);
   const [inviteForm, setInviteForm] = useState({
     email: '',
     role: 'developer',
     note: ''
   });
   const [inviteEmailError, setInviteEmailError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
 
-  const handleSave = () => {
-    setTeamInfo(editForm);
-    setIsEditing(false);
+  useEffect(() => {
+    if (teamId) {
+      loadTeamData();
+    }
+  }, [teamId]);
+
+  const loadTeamData = async () => {
+    if (!teamId) return;
+    
+    try {
+      setLoading(true);
+      const data = await fetchTeam(teamId);
+      const team = data?.team;
+      
+      if (team) {
+        setTeamInfo(team);
+        setEditForm({
+          name: team.name || '',
+          description: team.description || '',
+          standupTime: team.standupTime || '',
+          timezone: team.timezone || '',
+          slackChannel: team.slackChannel || '',
+          email: team.email || '',
+          isPrivate: team.isPrivate !== undefined ? team.isPrivate : true
+        });
+      }
+    } catch (err: any) {
+      toast.error('Failed to load team data', {
+        description: err.message || 'Please try again later'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  };
+
+  const formatTime = (time: string, timezone: string) => {
+    if (!time) return '';
+    // If time is in HH:MM format, convert to readable format
+    if (time.includes(':')) {
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm} ${timezone?.toUpperCase() || ''}`;
+    }
+    return `${time} ${timezone?.toUpperCase() || ''}`;
+  };
+
+  const handleSave = async () => {
+    if (!teamId) return;
+    
+    try {
+      setIsSaving(true);
+      const data = await updateTeam(teamId, {
+        name: editForm.name,
+        description: editForm.description,
+        standupTime: editForm.standupTime,
+        timezone: editForm.timezone.toLowerCase(),
+        slackChannel: editForm.slackChannel || undefined,
+        email: editForm.email || undefined,
+        isPrivate: editForm.isPrivate
+      });
+
+      if (data?.team) {
+        setTeamInfo(data.team);
+        toast.success('Team details updated successfully');
+        setIsEditing(false);
+      }
+    } catch (err: any) {
+      toast.error('Failed to update team', {
+        description: err.message || 'Please try again'
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    setEditForm(teamInfo);
+    if (teamInfo) {
+      setEditForm({
+        name: teamInfo.name || '',
+        description: teamInfo.description || '',
+        standupTime: teamInfo.standupTime || '',
+        timezone: teamInfo.timezone || '',
+        slackChannel: teamInfo.slackChannel || '',
+        email: teamInfo.email || '',
+        isPrivate: teamInfo.isPrivate !== undefined ? teamInfo.isPrivate : true
+      });
+    }
     setIsEditing(false);
   };
 
-  const handleSendInvite = () => {
-    // Email validation regex
+  const handleSendInvite = async () => {
+    if (!teamId) return;
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteForm.email)) {
       setInviteEmailError('Please enter a valid email address');
       return;
     }
-    // Handle invite logic here
-    setShowInviteModal(false);
-    setInviteForm({ email: '', role: 'developer', note: '' });
-    setInviteEmailError('');
+
+    try {
+      setIsInviting(true);
+      const result = await addTeamMembers(teamId, [inviteForm.email]);
+      
+      if (result?.added?.length > 0) {
+        toast.success('Member invited successfully');
+        setShowInviteModal(false);
+        setInviteForm({ email: '', role: 'developer', note: '' });
+        setInviteEmailError('');
+        // Reload team data to update member count
+        loadTeamData();
+      } else if (result?.notFound?.length > 0) {
+        toast.error('User not found', {
+          description: 'This email is not registered. Please ask them to sign up first.'
+        });
+      }
+    } catch (err: any) {
+      toast.error('Failed to invite member', {
+        description: err.message || 'Please try again'
+      });
+    } finally {
+      setIsInviting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-slate-600">Loading team data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!teamInfo) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-slate-600">No team selected</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -93,10 +224,10 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6">
           {/* Main Info */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="p-8 rounded-3xl border-border shadow-xl bg-card">
+          <div className="space-y-6">
+            <Card className="p-8 rounded-3xl border-border shadow-xl bg-card relative">
               {!isEditing ? (
                 <>
                   <div className="flex items-start gap-6 mb-6">
@@ -106,9 +237,18 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                     <div className="flex-1">
                       <h2 className="mb-3">{teamInfo.name}</h2>
                       <p className="text-slate-600 leading-relaxed text-justify">
-                        {teamInfo.description}
+                        {teamInfo.description || 'No description provided'}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditing(true)}
+                      className="rounded-xl gap-2 hover:bg-primary/10 absolute top-8 right-8"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Edit Team Details
+                    </Button>
                   </div>
 
                   <Separator className="my-6" />
@@ -123,7 +263,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                           </div>
                           <div>
                             <p className="text-slate-500 text-sm mb-0.5">Slack Channel</p>
-                            <p>{teamInfo.contactPoints.slack}</p>
+                            <p>{teamInfo.slackChannel || 'Not set'}</p>
                           </div>
                         </div>
 
@@ -133,7 +273,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                           </div>
                           <div className="min-w-0">
                             <p className="text-slate-500 text-sm mb-0.5">Team Email</p>
-                            <p className="truncate">{teamInfo.contactPoints.email}</p>
+                            <p className="truncate">{teamInfo.email || 'Not set'}</p>
                           </div>
                         </div>
 
@@ -143,7 +283,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                           </div>
                           <div>
                             <p className="text-slate-500 text-sm mb-0.5">Created</p>
-                            <p>{teamInfo.created}</p>
+                            <p>{formatDate(teamInfo.createdAt)}</p>
                           </div>
                         </div>
                       </div>
@@ -158,7 +298,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                           </div>
                           <div>
                             <p className="text-slate-500 text-sm mb-0.5">Members</p>
-                            <p>{teamInfo.memberCount} team members</p>
+                            <p>{teamInfo.memberCount || 0} team members</p>
                           </div>
                         </div>
 
@@ -168,7 +308,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                           </div>
                           <div>
                             <p className="text-slate-500 text-sm mb-0.5">Standup Time</p>
-                            <p>{teamInfo.standupTime} {teamInfo.timezone}</p>
+                            <p>{formatTime(teamInfo.standupTime, teamInfo.timezone)}</p>
                           </div>
                         </div>
 
@@ -179,7 +319,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                           <div>
                             <p className="text-slate-500 text-sm mb-0.5">Visibility</p>
                             <Badge variant="secondary" className="rounded-lg mt-1 bg-slate-100">
-                              {teamInfo.visibility}
+                              {teamInfo.isPrivate ? 'Private' : 'Public'}
                             </Badge>
                           </div>
                         </div>
@@ -213,11 +353,9 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                     <div className="space-y-2">
                       <Label>Slack Channel</Label>
                       <Input
-                        value={editForm.contactPoints.slack}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          contactPoints: { ...editForm.contactPoints, slack: e.target.value }
-                        })}
+                        value={editForm.slackChannel}
+                        onChange={(e) => setEditForm({ ...editForm, slackChannel: e.target.value })}
+                        placeholder="#team-channel"
                         className="rounded-xl h-11 border-slate-200"
                       />
                     </div>
@@ -225,11 +363,10 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                     <div className="space-y-2">
                       <Label>Team Email</Label>
                       <Input
-                        value={editForm.contactPoints.email}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          contactPoints: { ...editForm.contactPoints, email: e.target.value }
-                        })}
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        placeholder="team@company.com"
                         className="rounded-xl h-11 border-slate-200"
                       />
                     </div>
@@ -240,8 +377,8 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                       <Label>Standup Time</Label>
                       <Input
                         type="time"
-                        value={editForm.standupTime.split(' ')[0]}
-                        onChange={(e) => setEditForm({ ...editForm, standupTime: e.target.value + ' ' + editForm.timezone })}
+                        value={editForm.standupTime}
+                        onChange={(e) => setEditForm({ ...editForm, standupTime: e.target.value })}
                         className="rounded-xl h-11 border-slate-200"
                       />
                     </div>
@@ -271,6 +408,7 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                       onClick={handleCancel}
                       variant="outline"
                       className="rounded-xl border-border hover:bg-primary/10"
+                      disabled={isSaving}
                     >
                       <X className="w-4 h-4 mr-2" />
                       Cancel
@@ -278,78 +416,16 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                     <Button
                       onClick={handleSave}
                       className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/20"
+                      disabled={isSaving}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+                      {isSaving ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
                 </div>
               )}
             </Card>
 
-            <Card className="p-8 rounded-3xl border-slate-200 shadow-lg bg-gradient-to-br from-primary/5 via-indigo-50/30 to-teal-50/30">
-              <h3 className="mb-4">Team Mission</h3>
-              <p className="text-slate-600 leading-relaxed text-justify">
-                Our team is dedicated to creating world-class mobile experiences. We focus on performance, 
-                user experience, and delivering features that matter to our customers. We work collaboratively 
-                across time zones and maintain high standards for code quality and design.
-              </p>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card className="p-6 rounded-3xl border-border shadow-lg bg-card">
-              <h3 className="mb-6">Quick Actions</h3>
-              <div className="space-y-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start rounded-xl gap-3 h-12 hover:bg-primary/10 border-border"
-                  onClick={onNavigateToMembers}
-                >
-                  <Users className="w-5 h-5 text-primary" />
-                  <span>View Team Members</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start rounded-xl gap-3 h-12 hover:bg-primary/10 border-border"
-                  onClick={() => setShowInviteModal(true)}
-                >
-                  <Mail className="w-5 h-5 text-accent" />
-                  <span>Invite New Member</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start rounded-xl gap-3 h-12 hover:bg-primary/10 border-border"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Edit className="w-5 h-5 text-success" />
-                  <span>Edit Team Details</span>
-                </Button>
-              </div>
-            </Card>
-
-            <Card className="p-6 rounded-3xl border-primary/20 shadow-lg bg-gradient-to-br from-primary/5 to-accent/5">
-              <div className="text-center">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <BookOpen className="w-7 h-7 text-white" />
-                </div>
-                <h4 className="mb-2">Team Knowledge Base</h4>
-                <p className="text-slate-600 text-sm mb-4">
-                  {teamInfo.memberCount} members collaborating on shared knowledge
-                </p>
-                <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
-                  <div className="flex -space-x-2">
-                    {['SC', 'MJ', 'EW', 'AK'].map((initials, i) => (
-                      <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-100 to-slate-50 border-2 border-white flex items-center justify-center shadow-sm">
-                        <span className="text-xs text-slate-700">{initials}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <span>+{teamInfo.memberCount - 4} more</span>
-                </div>
-              </div>
-            </Card>
           </div>
         </div>
       </div>
@@ -414,16 +490,17 @@ export function AboutPage({ onNavigateToMembers }: AboutPageProps) {
                 onClick={() => setShowInviteModal(false)}
                 variant="outline"
                 className="flex-1 rounded-xl border-border hover:bg-primary/10"
+                disabled={isInviting}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleSendInvite}
-                disabled={!inviteForm.email}
+                disabled={!inviteForm.email || isInviting}
                 className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/20"
               >
                 <Send className="w-4 h-4 mr-2" />
-                Send Invite
+                {isInviting ? 'Inviting...' : 'Send Invite'}
               </Button>
             </div>
           </div>

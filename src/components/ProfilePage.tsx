@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -18,27 +18,87 @@ import {
   Globe, 
   Briefcase,
   Users,
-  FileText,
   Edit,
   Save,
   X
 } from 'lucide-react';
+import { fetchCurrentUser, updateProfile } from '../api/auth';
+import { fetchMyTeams } from '../api/teams';
+import { toast } from 'sonner@2.0.3';
 
 export function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any | null>(null);
+  const [teams, setTeams] = useState<any[]>([]);
+  
   const [profile, setProfile] = useState({
-    name: 'John Doe',
-    email: 'john@insighthub.com',
-    phone: '+1 (555) 123-4567',
-    role: 'Developer',
+    name: '',
+    email: '',
+    phone: '',
+    role: 'Member',
     timezone: 'PST'
   });
 
   const [editForm, setEditForm] = useState(profile);
 
-  const handleSave = () => {
-    setProfile(editForm);
-    setIsEditing(false);
+  useEffect(() => {
+    loadProfileData();
+  }, []);
+
+  const loadProfileData = async () => {
+    try {
+      setLoading(true);
+      const [userData, teamsData] = await Promise.all([
+        fetchCurrentUser(),
+        fetchMyTeams()
+      ]);
+
+      setUser(userData);
+      setTeams(teamsData?.teams || []);
+
+      const profileData = {
+        name: userData?.fullName || 'User',
+        email: userData?.email || '',
+        phone: userData?.phone || '',
+        role: userData?.role || 'Member',
+        timezone: userData?.timezone || 'PST'
+      };
+      setProfile(profileData);
+      setEditForm(profileData);
+    } catch (err: any) {
+      toast.error('Failed to load profile data', {
+        description: err.message || 'Please try again later'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const updated = await updateProfile({
+        fullName: editForm.name,
+        phone: editForm.phone,
+        role: editForm.role.toLowerCase(),
+        timezone: editForm.timezone.toLowerCase()
+      });
+
+      setProfile({
+        name: updated.fullName || editForm.name,
+        email: updated.email || editForm.email,
+        phone: updated.phone || editForm.phone,
+        role: updated.role || editForm.role,
+        timezone: updated.timezone || editForm.timezone
+      });
+      setUser(updated);
+      setIsEditing(false);
+      toast.success('Profile updated successfully');
+    } catch (err: any) {
+      toast.error('Failed to update profile', {
+        description: err.message || 'Please try again'
+      });
+    }
   };
 
   const handleCancel = () => {
@@ -46,16 +106,20 @@ export function ProfilePage() {
     setIsEditing(false);
   };
 
-  const teams = [
-    { name: 'Mobile App Team', role: 'Developer', memberCount: 6 },
-    { name: 'API Platform', role: 'Manager', memberCount: 8 }
-  ];
+  const handleEditClick = () => {
+    setEditForm(profile);
+    setIsEditing(true);
+  };
 
-  const recentDocs = [
-    { title: 'Authentication Best Practices', date: '2 days ago' },
-    { title: 'Mobile Integration Guide', date: '5 days ago' },
-    { title: 'Testing Runbook', date: '1 week ago' }
-  ];
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-slate-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -135,7 +199,7 @@ export function ProfilePage() {
 
                 <Button 
                   className="w-full mt-8 rounded-xl gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/20" 
-                  onClick={() => setIsEditing(true)}
+                  onClick={handleEditClick}
                 >
                   <Edit className="w-4 h-4" />
                   Edit Profile
@@ -222,88 +286,46 @@ export function ProfilePage() {
               </>
             )}
           </Card>
-
-          <Card className="p-6 rounded-3xl border-slate-200 shadow-lg bg-gradient-to-br from-primary/5 via-indigo-50/30 to-teal-50/30">
-            <h3 className="mb-4">Quick Stats</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-white/60 backdrop-blur-sm rounded-xl">
-                <span className="text-slate-600">Teams</span>
-                <span className="text-slate-900">{teams.length}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-white/60 backdrop-blur-sm rounded-xl">
-                <span className="text-slate-600">Documents</span>
-                <span className="text-slate-900">{recentDocs.length}</span>
-              </div>
-            </div>
-          </Card>
         </div>
 
         {/* Right Column - Activity */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="p-8 rounded-3xl border-slate-200 shadow-lg bg-white">
-            <div className="flex items-center justify-between mb-6">
-              <h3>My Teams</h3>
-              <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-primary/10">
-                View All
-              </Button>
-            </div>
+            <h3 className="mb-6">My Teams</h3>
             <div className="space-y-4">
-              {teams.map((team, index) => (
-                <div
-                  key={index}
-                  className="p-6 bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 hover:border-primary/20 hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-                        <Users className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="mb-1">{team.name}</p>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="secondary" className="rounded-lg bg-slate-100">
-                            {team.role}
-                          </Badge>
-                          <span className="text-slate-500 text-sm">
-                            {team.memberCount} members
-                          </span>
+              {teams.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No teams yet</p>
+                  <p className="text-sm">Join or create a team to get started</p>
+                </div>
+              ) : (
+                teams.map((team) => (
+                  <div
+                    key={team.id}
+                    className="p-6 bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 hover:border-primary/20 hover:shadow-md transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="mb-1">{team.name}</p>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="rounded-lg bg-slate-100">
+                              Member
+                            </Badge>
+                            <span className="text-slate-500 text-sm">
+                              {team.memberCount || 0} members
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-8 rounded-3xl border-slate-200 shadow-lg bg-white">
-            <div className="flex items-center justify-between mb-6">
-              <h3>Recent Documents</h3>
-              <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-primary/10">
-                View All
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {recentDocs.map((doc, index) => (
-                <div
-                  key={index}
-                  className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 hover:border-primary/20 hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="mb-0.5">{doc.title}</p>
-                        <span className="text-slate-500 text-sm">
-                          Updated {doc.date}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
         </div>
