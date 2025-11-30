@@ -19,33 +19,77 @@ import {
   SelectValue,
 } from './ui/select';
 import { FileUploader } from './FileUploader';
+import { uploadDocument } from '../api/documents';
 import { toast } from 'sonner@2.0.3';
 
 interface DocumentUploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  teamId?: string;
+  onUploadComplete?: () => void;
 }
 
-export function DocumentUploadModal({ open, onOpenChange }: DocumentUploadModalProps) {
+export function DocumentUploadModal({ open, onOpenChange, teamId, onUploadComplete }: DocumentUploadModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     tag: '',
     summary: ''
   });
   const [files, setFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Show success toast
-    toast.success('Document uploaded successfully!', {
-      description: `${formData.title} has been added to your team's knowledge base.`
-    });
+    if (!teamId) {
+      toast.error('Team ID is required');
+      return;
+    }
+
+    if (!files.length) {
+      toast.error('Please select a file');
+      return;
+    }
+
+    const file = files[0];
     
-    // Reset form
-    setFormData({ title: '', tag: '', summary: '' });
-    setFiles([]);
-    onOpenChange(false);
+    // Validate PDF file type
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Only PDF files are allowed');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      
+      await uploadDocument({
+        teamId,
+        title: formData.title,
+        tag: formData.tag,
+        summary: formData.summary || undefined,
+        file // Send the actual file
+      });
+      
+      toast.success('Document uploaded successfully!', {
+        description: `${formData.title} has been added to your team's knowledge base.`
+      });
+      
+      // Reset form
+      setFormData({ title: '', tag: '', summary: '' });
+      setFiles([]);
+      onOpenChange(false);
+      
+      // Notify parent component
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+    } catch (err: any) {
+      toast.error('Failed to upload document', {
+        description: err.message || 'Please try again'
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -54,12 +98,12 @@ export function DocumentUploadModal({ open, onOpenChange }: DocumentUploadModalP
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
-            Add a new document to your team's knowledge base. The AI will use this to answer questions.
+            Add a new PDF document to your team's knowledge base. Only PDF files are supported.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <FileUploader onFilesSelect={setFiles} maxFiles={1} />
+          <FileUploader onFilesSelect={setFiles} maxFiles={1} acceptedTypes="application/pdf,.pdf" />
 
           <div className="space-y-2">
             <Label htmlFor="title">Document Title</Label>
@@ -121,9 +165,9 @@ export function DocumentUploadModal({ open, onOpenChange }: DocumentUploadModalP
             <Button
               type="submit"
               className="flex-1 rounded-xl bg-primary hover:bg-primary/90"
-              disabled={!files.length || !formData.title || !formData.tag}
+              disabled={!files.length || !formData.title || !formData.tag || isUploading || !teamId}
             >
-              Upload Document
+              {isUploading ? 'Uploading...' : 'Upload Document'}
             </Button>
           </div>
         </form>

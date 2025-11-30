@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { ArrowLeft, Brain } from "lucide-react";
+import { login, storeAuth } from "../api/auth";
 
 interface LoginPageProps {
   onNavigate: (page: string) => void;
@@ -16,18 +17,33 @@ export function LoginPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate password length
     if (password.length < 8) {
       setPasswordError('Password must be at least 8 characters long');
       return;
     }
-    
+
     setPasswordError('');
-    onLogin();
+    setFormError("");
+
+    try {
+      setIsSubmitting(true);
+      const data = await login({ email, password });
+      if (data?.token && data?.user) {
+        storeAuth(data.token, data.user);
+      }
+      onLogin();
+    } catch (err: any) {
+      setFormError(err.message || "Unable to log in. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -106,12 +122,17 @@ export function LoginPage({
               )}
             </div>
 
+            {formError && (
+              <p className="text-red-500 text-sm mt-1">{formError}</p>
+            )}
+
             <Button
               type="submit"
-              className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/30 h-12"
+              className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg shadow-primary/30 h-12 disabled:opacity-60"
               size="lg"
+              disabled={isSubmitting}
             >
-              Log In
+              {isSubmitting ? "Logging in..." : "Log In"}
             </Button>
           </form>
 

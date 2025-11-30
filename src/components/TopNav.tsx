@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bell, Brain, FileText, Clock, X, User, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Brain, FileText, Clock, X, User, LogOut, Users, Edit, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
@@ -12,56 +12,124 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { fetchTeamNotifications, deleteNotification, Notification } from '../api/notifications';
+import { toast } from 'sonner@2.0.3';
 
 interface TopNavProps {
   onNavigateToProfile?: () => void;
   onLogout?: () => void;
   onNavigateToHome?: () => void;
+  user?: {
+    fullName?: string;
+    email?: string;
+  } | null;
+  currentTeamId?: string | null;
 }
 
-export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome }: TopNavProps) {
+export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome, user, currentTeamId }: TopNavProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const notifications = [
-    {
-      id: 1,
-      type: 'upload',
-      user: 'Sarah Chen',
-      userInitials: 'SC',
-      document: 'Q4 Product Roadmap.pdf',
-      timestamp: '2 hours ago',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'upload',
-      user: 'Mike Johnson',
-      userInitials: 'MJ',
-      document: 'API Documentation v2.1.docx',
-      timestamp: '5 hours ago',
-      read: false
-    },
-    {
-      id: 3,
-      type: 'upload',
-      user: 'Emily Watson',
-      userInitials: 'EW',
-      document: 'Design System Guidelines.pdf',
-      timestamp: '1 day ago',
-      read: true
-    },
-    {
-      id: 4,
-      type: 'upload',
-      user: 'Alex Kim',
-      userInitials: 'AK',
-      document: 'Sprint Planning Notes.md',
-      timestamp: '2 days ago',
-      read: true
+  // Generate initials from user's full name
+  const getInitials = (name?: string): string => {
+    if (!name) return 'U'; // Default to 'U' for User
+    
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) {
+      // Single name - take first 2 letters
+      return parts[0].substring(0, 2).toUpperCase();
+    } else {
+      // Multiple names - take first letter of first and last name
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
-  ];
+  };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const userInitials = getInitials(user?.fullName);
+
+  // Load notifications when sheet opens and team changes
+  useEffect(() => {
+    if (showNotifications && currentTeamId) {
+      loadNotifications();
+    }
+  }, [showNotifications, currentTeamId]);
+
+  const loadNotifications = async () => {
+    if (!currentTeamId) return;
+    
+    try {
+      setLoading(true);
+      const data = await fetchTeamNotifications(currentTeamId);
+      setNotifications(data.notifications || []);
+    } catch (err: any) {
+      console.error('Failed to load notifications', err);
+      toast.error('Failed to load notifications', {
+        description: err.message || 'Please try again'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    try {
+      await deleteNotification(notificationId);
+      setNotifications(notifications.filter(n => n.id !== notificationId));
+      toast.success('Notification removed');
+    } catch (err: any) {
+      toast.error('Failed to remove notification', {
+        description: err.message || 'Please try again'
+      });
+    }
+  };
+
+  const formatRelativeTime = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'document_uploaded':
+        return <FileText className="w-4 h-4 text-primary" />;
+      case 'member_added':
+        return <Users className="w-4 h-4 text-success" />;
+      case 'member_removed':
+        return <Users className="w-4 h-4 text-destructive" />;
+      case 'team_updated':
+        return <Edit className="w-4 h-4 text-warning" />;
+      default:
+        return <Bell className="w-4 h-4 text-primary" />;
+    }
+  };
+
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'document_uploaded':
+        return 'from-primary/10 to-primary/5';
+      case 'member_added':
+        return 'from-success/10 to-success/5';
+      case 'member_removed':
+        return 'from-destructive/10 to-destructive/5';
+      case 'team_updated':
+        return 'from-warning/10 to-warning/5';
+      default:
+        return 'from-primary/10 to-primary/5';
+    }
+  };
+
+  const unreadCount = notifications.length; // All notifications are "unread" until deleted
 
   return (
     <>
@@ -98,7 +166,7 @@ export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome }: TopN
               <button className="focus:outline-none">
                 <Avatar className="w-9 h-9 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
                   <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-                    JD
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
               </button>
@@ -138,49 +206,68 @@ export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome }: TopN
           </SheetHeader>
 
           <div className="mt-6 space-y-1">
-            {notifications.map((notification) => (
-              <div key={notification.id}>
-                <div 
-                  className={`p-4 rounded-2xl cursor-pointer transition-colors ${
-                    notification.read 
-                      ? 'hover:bg-slate-50' 
-                      : 'bg-gradient-to-br from-primary/5 to-accent/5 hover:from-primary/10 hover:to-accent/10'
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 text-primary">
-                        {notification.userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0">
-                          <FileText className="w-4 h-4 text-primary" />
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-slate-600">Loading notifications...</p>
+              </div>
+            ) : notifications.length > 0 ? (
+              notifications.map((notification, index) => (
+                <div key={notification.id}>
+                  <div className="p-4 rounded-2xl transition-colors bg-gradient-to-br hover:from-primary/10 hover:to-accent/10 group">
+                    <div className="flex gap-3">
+                      {notification.createdBy ? (
+                        <Avatar className="w-10 h-10 flex-shrink-0">
+                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 text-primary">
+                            {getInitials(notification.createdBy.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center flex-shrink-0">
+                          <Bell className="w-5 h-5 text-slate-400" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm">
-                            <span className="font-medium text-foreground">{notification.user}</span>
-                            {' uploaded '}
-                            <span className="font-medium text-primary">{notification.document}</span>
-                          </p>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-2 mb-1">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getNotificationColor(notification.type)} flex items-center justify-center flex-shrink-0`}>
+                            {getNotificationIcon(notification.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-foreground">
+                              {notification.message}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteNotification(notification.id)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 ml-10">
-                        <Clock className="w-3 h-3" />
-                        <span>{notification.timestamp}</span>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 ml-10">
+                          <Clock className="w-3 h-3" />
+                          <span>{formatRelativeTime(notification.createdAt)}</span>
+                        </div>
                       </div>
                     </div>
-                    {!notification.read && (
-                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1"></div>
-                    )}
                   </div>
+                  {index !== notifications.length - 1 && (
+                    <Separator className="my-1" />
+                  )}
                 </div>
-                {notification.id !== notifications[notifications.length - 1].id && (
-                  <Separator className="my-1" />
-                )}
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center mb-4">
+                  <Bell className="w-8 h-8 text-slate-400" />
+                </div>
+                <h4 className="mb-2 text-slate-900">No notifications</h4>
+                <p className="text-slate-500 text-sm">
+                  {currentTeamId ? "You're all caught up!" : "Select a team to see notifications"}
+                </p>
               </div>
-            ))}
+            )}
           </div>
 
           {notifications.length === 0 && (

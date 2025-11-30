@@ -12,13 +12,21 @@ import {
   SelectValue,
 } from './ui/select';
 import { Switch } from './ui/switch';
-import { ArrowLeft, ArrowRight, Clock } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface CreateTeamPageProps {
   onNavigate: (page: string) => void;
+  onSaveDraft: (data: {
+    teamName: string;
+    description: string;
+    teamMission: string;
+    standupTime: string;
+    timezone: string;
+    isPrivate: boolean;
+  }) => void;
 }
 
-export function CreateTeamPage({ onNavigate }: CreateTeamPageProps) {
+export function CreateTeamPage({ onNavigate, onSaveDraft }: CreateTeamPageProps) {
   const [formData, setFormData] = useState({
     teamName: '',
     description: '',
@@ -30,8 +38,18 @@ export function CreateTeamPage({ onNavigate }: CreateTeamPageProps) {
     isPrivate: true
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    onSaveDraft({
+      teamName: formData.teamName,
+      description: formData.description,
+      teamMission: formData.teamMission,
+      standupTime: formData.standupTime,
+      timezone: formData.timezone,
+      isPrivate: formData.isPrivate,
+    });
+
     onNavigate('team-setup');
   };
 
@@ -45,7 +63,7 @@ export function CreateTeamPage({ onNavigate }: CreateTeamPageProps) {
         <Button
           variant="ghost"
           className="mb-8 gap-2 rounded-xl text-slate-700 hover:text-slate-900"
-          onClick={() => onNavigate('onboarding-choice')}
+          onClick={() => onNavigate('app')}
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -186,7 +204,7 @@ export function CreateTeamPage({ onNavigate }: CreateTeamPageProps) {
                 type="button"
                 variant="outline"
                 className="rounded-xl h-12"
-                onClick={() => onNavigate('onboarding-choice')}
+                onClick={() => onNavigate('app')}
               >
                 Cancel
               </Button>
