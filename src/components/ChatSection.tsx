@@ -3,20 +3,34 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { MessageSquare, Send, Sparkles, User, Bot, Lock, Info, Loader2 } from 'lucide-react';
+import { Send, Sparkles, User, Bot, Lock, Info, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { getAuthHeader } from '../api/auth';
 
-export function ChatSection() {
+export function ChatSection({ teamId }: { teamId?: string }) {
   const [messages, setMessages] = useState([
     {
       id: 1,
       type: 'bot',
-      content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything!",
+      content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
       timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     },
   ]);
 
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Reset chat when team changes
+  React.useEffect(() => {
+    setMessages([
+      {
+        id: 1,
+        type: 'bot',
+        content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
+        timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      },
+    ]);
+  }, [teamId]);
 
   const quickPrompts = [
     "Show me the design system guidelines",
@@ -49,10 +63,12 @@ export function ChatSection() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
+          ...getAuthHeader()
+        } as HeadersInit,
         body: JSON.stringify({
           message: currentInput,
-          history: chatHistory
+          history: chatHistory,
+          teamId: teamId // Pass teamId for RAG
         }),
       });
 
@@ -69,6 +85,7 @@ export function ChatSection() {
           type: 'bot',
           content: data.response,
           timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          source: data.sources && data.sources.length > 0 ? `Based on: ${data.sources.slice(0, 2).join(', ')}${data.sources.length > 2 ? '...' : ''}` : undefined
         };
         
         setMessages(prev => [...prev, aiResponse]);
@@ -156,9 +173,20 @@ export function ChatSection() {
                           : 'bg-gradient-to-br from-primary to-primary/90 text-white'
                         }
                       `}>
-                        <p className="whitespace-pre-wrap leading-relaxed">
-                          {message.content}
-                        </p>
+                        <div className="prose prose-sm max-w-none leading-relaxed break-words dark:prose-invert">
+                          <ReactMarkdown
+                            components={{
+                              p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                              a: ({node, ...props}) => <a className="underline hover:text-blue-500" target="_blank" rel="noopener noreferrer" {...props} />,
+                              ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                              ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                              li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                              strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
                         {message.source && (
                           <Badge variant="outline" className="rounded-lg mt-3 border-primary/20 bg-white/50">
                             <Sparkles className="w-3 h-3 mr-1.5 text-primary" />

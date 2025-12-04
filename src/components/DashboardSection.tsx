@@ -135,7 +135,7 @@ export function DashboardSection() {
           <div className="space-y-3 mb-4">
             <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
               <p className="text-muted-foreground mb-2">
-                Ask me anything about your team's docs
+                Ask me anything about your team
               </p>
               <MessageSquare className="w-5 h-5 text-primary" />
             </div>

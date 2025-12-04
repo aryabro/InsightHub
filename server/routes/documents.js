@@ -1,9 +1,15 @@
 import express from "express";
 import multer from "multer";
+import { createRequire } from "module";
 import { requireAuth } from "../middleware/auth.js";
 import Document from "../models/Document.js";
+import DocumentChunk from "../models/DocumentChunk.js";
 import Team from "../models/Team.js";
 import { createNotification } from "./notifications.js";
+import { processTextToChunks } from "../services/embeddings.js";
+
+const require = createRequire(import.meta.url);
+const { PDFParse } = require("pdf-parse");
 
 const router = express.Router();
 
@@ -66,6 +72,48 @@ router.post("/", requireAuth, upload.single("file"), async (req, res) => {
       mimeType: 'application/pdf', // Force PDF MIME type
       uploadedBy: req.user.id
     });
+
+    // --- RAG: Extract text from PDF and create embeddings ---
+    try {
+      console.log(`📄 Processing PDF for RAG: ${title}`);
+      
+      // Parse PDF to extract text
+      const parser = new PDFParse({ data: file.buffer });
+      const pdfResult = await parser.getText();
+      const extractedText = pdfResult.text;
+      
+      // Clean up parser resources
+      await parser.destroy();
+      
+      if (extractedText && extractedText.trim().length > 0) {
+        console.log(`📝 Extracted ${extractedText.length} characters from PDF`);
+        
+        // Process text into chunks with embeddings
+        const chunksWithEmbeddings = await processTextToChunks(extractedText);
+        
+        console.log(`🔢 Generated ${chunksWithEmbeddings.length} chunks with embeddings`);
+        
+        // Save chunks to database
+        if (chunksWithEmbeddings.length > 0) {
+          const chunkDocs = chunksWithEmbeddings.map(chunk => ({
+            document: doc._id,
+            team: teamId,
+            text: chunk.text,
+            embedding: chunk.embedding,
+            chunkIndex: chunk.chunkIndex
+          }));
+          
+          await DocumentChunk.insertMany(chunkDocs);
+          console.log(`✅ Saved ${chunkDocs.length} document chunks for RAG`);
+        }
+      } else {
+        console.log(`⚠️ No text extracted from PDF: ${title}`);
+      }
+    } catch (ragError) {
+      // Log error but don't fail the upload - RAG is a bonus feature
+      console.error("RAG processing error (non-fatal):", ragError);
+    }
+    // --- End RAG processing ---
 
     // Create notification for document upload
     await createNotification({
@@ -385,6 +433,9 @@ router.delete("/:id", requireAuth, async (req, res) => {
     }
 
     await Document.findByIdAndDelete(req.params.id);
+    
+    // Also delete associated chunks for RAG
+    await DocumentChunk.deleteMany({ document: req.params.id });
 
     return res.json({ success: true });
   } catch (err) {

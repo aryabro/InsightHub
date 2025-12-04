@@ -199,7 +199,7 @@ export default function App() {
           />
         );
       case 'chat':
-        return <ChatSection />;
+        return <ChatSection teamId={currentTeam?.id} />;
       case 'join-team':
         return (
           <JoinTeamPage 
