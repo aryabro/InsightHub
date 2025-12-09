@@ -20,7 +20,8 @@ const MONGO_URI =
 // Middleware
 const allowedOrigins = [
   "http://localhost:3000",
-  "http://localhost:5173"
+  "http://localhost:5173",
+  "https://cs-409-webstars.vercel.app"
 ];
 
 app.use(
