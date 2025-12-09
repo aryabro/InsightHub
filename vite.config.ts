@@ -1,9 +1,14 @@
 
-  import { defineConfig } from 'vite';
+  import { defineConfig, loadEnv } from 'vite';
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
 
-  export default defineConfig({
+  export default defineConfig(({ mode }) => {
+    // Load environment variables so we can optionally configure the dev proxy target
+    const env = loadEnv(mode, process.cwd(), '');
+    const proxyTarget = env.VITE_DEV_PROXY_TARGET || env.VITE_API_BASE_URL || 'http://localhost:4000';
+
+    return {
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -53,14 +58,15 @@
       target: 'esnext',
       outDir: 'build',
     },
-  server: {
-    port: 3000,
-    open: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
+    server: {
+      port: 3000,
+      open: true,
+      proxy: {
+        '/api': {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
       },
     },
-  },
+  };
   });
