@@ -7,6 +7,8 @@ import { Send, Sparkles, User, Bot, Lock, Info, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getAuthHeader } from '../api/auth';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
 export function ChatSection({ teamId }: { teamId?: string }) {
   const [messages, setMessages] = useState([
     {
@@ -59,7 +61,7 @@ export function ChatSection({ teamId }: { teamId?: string }) {
       // Only send actual user/bot messages, exclude the greeting
       const chatHistory = messages.slice(1).filter(msg => msg.content && msg.content.trim());
       
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
