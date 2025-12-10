@@ -1,6 +1,6 @@
 import { getAuthHeader } from './auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export interface Notification {
   id: string;
