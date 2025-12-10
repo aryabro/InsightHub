@@ -7,32 +7,32 @@ import { Send, Sparkles, User, Bot, Lock, Info, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getAuthHeader } from '../api/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-export function ChatSection({ teamId }: { teamId?: string }) {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'bot',
-      content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    },
-  ]);
+export type ChatMessage = {
+  id: number;
+  type: 'user' | 'bot';
+  content: string;
+  timestamp: string;
+  source?: string;
+};
 
+interface ChatSectionProps {
+  teamId?: string;
+  messages: ChatMessage[];
+  onMessagesChange: (messages: ChatMessage[]) => void;
+}
+
+const getInitialMessage = (): ChatMessage => ({
+  id: 1,
+  type: 'bot',
+  content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
+  timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+});
+
+export function ChatSection({ teamId, messages, onMessagesChange }: ChatSectionProps) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Reset chat when team changes
-  React.useEffect(() => {
-    setMessages([
-      {
-        id: 1,
-        type: 'bot',
-        content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
-        timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-      },
-    ]);
-  }, [teamId]);
 
   const quickPrompts = [
     "Show me the design system guidelines",
@@ -46,12 +46,15 @@ export function ChatSection({ teamId }: { teamId?: string }) {
     
     const userMessage = {
       id: messages.length + 1,
-      type: 'user',
+      type: 'user' as const,
       content: inputValue,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     };
     
-    setMessages(prev => [...prev, userMessage]);
+    // Add user message immediately
+    const updatedMessagesWithUser = [...messages, userMessage];
+    onMessagesChange(updatedMessagesWithUser);
+    
     const currentInput = inputValue;
     setInputValue('');
     setIsLoading(true);
@@ -59,9 +62,17 @@ export function ChatSection({ teamId }: { teamId?: string }) {
     try {
       // Call the backend API
       // Only send actual user/bot messages, exclude the greeting
-      const chatHistory = messages.slice(1).filter(msg => msg.content && msg.content.trim());
+      const chatHistory = updatedMessagesWithUser.slice(1).filter(msg => msg.content && msg.content.trim());
       
-      const response = await fetch(`${API_BASE}/api/chat`, {
+      // Use relative path in development (vite proxy), full URL in production
+      const chatUrl = import.meta.env.DEV ? '/api/chat' : `${API_BASE}/api/chat`;
+      
+      console.log('Sending chat request to:', chatUrl);
+      console.log('Message:', currentInput);
+      console.log('History length:', chatHistory.length);
+      console.log('Team ID:', teamId);
+      
+      const response = await fetch(chatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +86,12 @@ export function ChatSection({ teamId }: { teamId?: string }) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response from AI');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        // Create error object with status and details for better handling
+        const error = new Error(errorData.error || errorData.message || `Server error: ${response.status}`) as any;
+        error.status = response.status;
+        error.details = errorData.details || errorData.error || '';
+        throw error;
       }
 
       const data = await response.json();
@@ -83,33 +99,58 @@ export function ChatSection({ teamId }: { teamId?: string }) {
       // Only add the response if it's not empty
       if (data.response && data.response.trim()) {
         const aiResponse = {
-          id: messages.length + 2,
-          type: 'bot',
+          id: updatedMessagesWithUser.length + 1,
+          type: 'bot' as const,
           content: data.response,
           timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
           source: data.sources && data.sources.length > 0 ? `Based on: ${data.sources.slice(0, 2).join(', ')}${data.sources.length > 2 ? '...' : ''}` : undefined
         };
         
-        setMessages(prev => [...prev, aiResponse]);
+        onMessagesChange([...updatedMessagesWithUser, aiResponse]);
       } else {
         // If blank response, show error message instead
         const errorMessage = {
-          id: messages.length + 2,
-          type: 'bot',
+          id: updatedMessagesWithUser.length + 1,
+          type: 'bot' as const,
           content: "I received an empty response. Please try rephrasing your question.",
           timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
         };
-        setMessages(prev => [...prev, errorMessage]);
+        onMessagesChange([...updatedMessagesWithUser, errorMessage]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error calling chat API:', error);
+      let errorContent = "I'm sorry, I encountered an error while processing your request.";
+      
+      // Handle specific error types
+      if (error.status === 500) {
+        // Check if it's a quota/quota exceeded error
+        const errorDetails = error.details || error.message || '';
+        if (errorDetails.includes('quota') || errorDetails.includes('Quota exceeded') || errorDetails.includes('429')) {
+          errorContent = "I've reached my daily request limit. The free tier allows 20 requests per day. Please try again tomorrow or upgrade your API plan. Sorry for the inconvenience!";
+        } else if (errorDetails.includes('rate limit') || errorDetails.includes('rate-limit')) {
+          errorContent = "I'm being rate limited. Please wait a moment and try again.";
+        } else {
+          errorContent = "The AI service is temporarily unavailable. Please try again in a few moments.";
+        }
+      } else if (error.status === 400) {
+        errorContent = "There was an issue with your request. Please try rephrasing your question.";
+      } else if (error.status === 401 || error.status === 403) {
+        errorContent = "You're not authorized to use this feature. Please log in again.";
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorContent = "Unable to connect to the server. Please make sure the backend server is running and try again.";
+      } else if (error.message) {
+        errorContent = `Error: ${error.message}`;
+      } else {
+        errorContent += " Please try again or check the console for more details.";
+      }
+      
       const errorMessage = {
-        id: messages.length + 2,
-        type: 'bot',
-        content: "I'm sorry, I encountered an error while processing your request. Please make sure the backend server is running and try again.",
+        id: updatedMessagesWithUser.length + 1,
+        type: 'bot' as const,
+        content: errorContent,
         timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      onMessagesChange([...updatedMessagesWithUser, errorMessage]);
     } finally {
       setIsLoading(false);
     }

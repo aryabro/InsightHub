@@ -9,7 +9,7 @@ interface OnboardingChoiceProps {
 
 export function OnboardingChoice({ onNavigate }: OnboardingChoiceProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-8 py-16">
       <div className="w-full max-w-5xl">
         <div className="text-center mb-16">
           <h1 className="mb-4">Let's get you set up</h1>
@@ -18,7 +18,7 @@ export function OnboardingChoice({ onNavigate }: OnboardingChoiceProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24">
           {/* Create Team Card */}
           <Card className="p-10 rounded-3xl border-border shadow-xl hover:shadow-2xl hover:border-primary/30 transition-all cursor-pointer group bg-card/50 backdrop-blur-sm">
             <div className="text-center">
@@ -98,6 +98,18 @@ export function OnboardingChoice({ onNavigate }: OnboardingChoiceProps) {
               </Button>
             </div>
           </Card>
+        </div>
+
+        {/* Skip Button - Bottom Left */}
+        <div className="pl-4 md:pl-0">
+          <Button
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground hover:bg-transparent gap-2 cursor-pointer"
+            onClick={() => onNavigate('app')}
+          >
+            Skip for now
+            <ArrowRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>

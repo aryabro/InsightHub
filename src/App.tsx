@@ -31,6 +31,8 @@ export default function App() {
   const [myTeams, setMyTeams] = useState<any[]>([]);
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  // Store chat messages per team (in-memory only, clears on refresh)
+  const [chatMessages, setChatMessages] = useState<Record<string, any[]>>({});
 
   // On mount, restore auth from localStorage
   useEffect(() => {
@@ -62,11 +64,27 @@ export default function App() {
         setMyTeams(teams);
         setRecentDocs(docsRes?.documents || []);
 
+        // Restore team from localStorage if available, otherwise use first team
         if (!currentTeam && teams.length) {
-          setCurrentTeam(teams[0]);
+          const storedTeamId = localStorage.getItem('insighthub_currentTeamId');
+          if (storedTeamId) {
+            const storedTeam = teams.find(t => t.id === storedTeamId);
+            if (storedTeam) {
+              setCurrentTeam(storedTeam);
+            } else {
+              // Stored team no longer exists, use first team
+              setCurrentTeam(teams[0]);
+              localStorage.setItem('insighthub_currentTeamId', teams[0].id);
+            }
+          } else {
+            // No stored team, use first team
+            setCurrentTeam(teams[0]);
+            localStorage.setItem('insighthub_currentTeamId', teams[0].id);
+          }
         } else if (!teams.length && currentPage === 'app') {
           // If user has no teams and is on app page, show profile
           setActiveSection('profile');
+          localStorage.removeItem('insighthub_currentTeamId');
         }
       } catch (err) {
         console.error('Failed to load initial app data', err);
@@ -75,6 +93,21 @@ export default function App() {
 
     load();
   }, [isAuthenticated, currentTeam]);
+
+  // Initialize chat messages when a team is selected (if not already initialized)
+  useEffect(() => {
+    if (currentTeam?.id && (!chatMessages[currentTeam.id] || chatMessages[currentTeam.id].length === 0)) {
+      setChatMessages(prev => ({
+        ...prev,
+        [currentTeam.id]: [{
+          id: 1,
+          type: 'bot',
+          content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        }]
+      }));
+    }
+  }, [currentTeam?.id]);
 
   const handleNavigate = (page: string) => {
     setCurrentPage(page);
@@ -131,6 +164,8 @@ export default function App() {
       setMyTeams(teamsRes?.teams || []);
       // Set the newly joined team as current team
       setCurrentTeam(team);
+      // Save to localStorage
+      localStorage.setItem('insighthub_currentTeamId', team.id);
       // Switch to about section to show team dashboard
       setActiveSection('about');
     } catch (err) {
@@ -142,6 +177,20 @@ export default function App() {
     const team = myTeams.find(t => t.id === teamId);
     if (team) {
       setCurrentTeam(team);
+      // Save to localStorage so it persists on refresh
+      localStorage.setItem('insighthub_currentTeamId', teamId);
+      // Initialize chat messages for this team if not already exists
+      if (!chatMessages[teamId] || chatMessages[teamId].length === 0) {
+        setChatMessages(prev => ({
+          ...prev,
+          [teamId]: [{
+            id: 1,
+            type: 'bot',
+            content: "Hello! I'm your AI assistant powered by Google Gemini. Ask me anything about your team's documents!",
+            timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          }]
+        }));
+      }
       // Refresh the current section to show new team's data
       // Keep the same active section but update the team context
     }
@@ -149,6 +198,7 @@ export default function App() {
 
   const handleLogout = () => {
     clearAuth();
+    localStorage.removeItem('insighthub_currentTeamId');
     setIsAuthenticated(false);
     setCurrentPage('landing');
     setActiveSection('about');
@@ -199,7 +249,20 @@ export default function App() {
           />
         );
       case 'chat':
-        return <ChatSection teamId={currentTeam?.id} />;
+        return (
+          <ChatSection 
+            teamId={currentTeam?.id} 
+            messages={currentTeam?.id ? (chatMessages[currentTeam.id] || []) : []}
+            onMessagesChange={(newMessages) => {
+              if (currentTeam?.id) {
+                setChatMessages(prev => ({
+                  ...prev,
+                  [currentTeam.id]: newMessages
+                }));
+              }
+            }}
+          />
+        );
       case 'join-team':
         return (
           <JoinTeamPage 
@@ -267,6 +330,8 @@ export default function App() {
             teamDraft={teamDraft}
             onTeamCreated={async (team) => {
               setCurrentTeam(team);
+              // Save to localStorage
+              localStorage.setItem('insighthub_currentTeamId', team.id);
               // Refresh teams list to include the new team
               try {
                 const teamsRes = await fetchMyTeams();

@@ -70,9 +70,7 @@ export function DocumentUploadModal({ open, onOpenChange, teamId, onUploadComple
         file // Send the actual file
       });
       
-      toast.success('Document uploaded successfully!', {
-        description: `${formData.title} has been added to your team's knowledge base.`
-      });
+      toast.success('Document uploaded successfully!', {});
       
       // Reset form
       setFormData({ title: '', tag: '', summary: '' });

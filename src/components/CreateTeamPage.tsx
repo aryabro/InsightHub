@@ -63,7 +63,7 @@ export function CreateTeamPage({ onNavigate, onSaveDraft }: CreateTeamPageProps)
         <Button
           variant="ghost"
           className="mb-8 gap-2 rounded-xl text-slate-700 hover:text-slate-900"
-          onClick={() => onNavigate('app')}
+          onClick={() => onNavigate('onboarding-choice')}
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -204,7 +204,7 @@ export function CreateTeamPage({ onNavigate, onSaveDraft }: CreateTeamPageProps)
                 type="button"
                 variant="outline"
                 className="rounded-xl h-12"
-                onClick={() => onNavigate('app')}
+                onClick={() => onNavigate('onboarding-choice')}
               >
                 Cancel
               </Button>
