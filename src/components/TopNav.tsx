@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Brain, FileText, Clock, X, User, LogOut, Users, Edit, Trash2 } from 'lucide-react';
+import { Bell, Brain, FileText, Clock, User, LogOut, Users, Edit } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { fetchTeamNotifications, deleteNotification, Notification } from '../api/notifications';
+import { fetchTeamNotifications, Notification } from '../api/notifications';
 import { toast } from 'sonner@2.0.3';
 
 interface TopNavProps {
@@ -71,17 +71,6 @@ export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome, user, 
     }
   };
 
-  const handleDeleteNotification = async (notificationId: string) => {
-    try {
-      await deleteNotification(notificationId);
-      setNotifications(notifications.filter(n => n.id !== notificationId));
-      toast.success('Notification removed');
-    } catch (err: any) {
-      toast.error('Failed to remove notification', {
-        description: err.message || 'Please try again'
-      });
-    }
-  };
 
   const formatRelativeTime = (dateString: string) => {
     if (!dateString) return '';
@@ -236,14 +225,6 @@ export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome, user, 
                               {notification.message}
                             </p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleDeleteNotification(notification.id)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500 ml-10">
                           <Clock className="w-3 h-3" />
@@ -269,18 +250,6 @@ export function TopNav({ onNavigateToProfile, onLogout, onNavigateToHome, user, 
               </div>
             )}
           </div>
-
-          {notifications.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center mb-4">
-                <Bell className="w-8 h-8 text-slate-400" />
-              </div>
-              <h4 className="mb-2 text-slate-900">No notifications</h4>
-              <p className="text-slate-500 text-sm">
-                You're all caught up!
-              </p>
-            </div>
-          )}
         </SheetContent>
       </Sheet>
     </>

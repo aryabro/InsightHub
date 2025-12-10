@@ -213,9 +213,10 @@ export function ProfilePage() {
                     <Input
                       type="email"
                       value={editForm.email}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      className="rounded-xl h-11 border-slate-200"
+                      disabled
+                      className="rounded-xl h-11 border-slate-200 bg-slate-50 cursor-not-allowed opacity-70"
                     />
+                    <p className="text-xs text-slate-500">Email cannot be changed</p>
                   </div>
 
                   <div className="space-y-2">

@@ -12,8 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { DocumentUploadModal } from './DocumentUploadModal';
-import { ArrowLeft, ArrowRight, Mail, X, FileText, CheckCircle, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Mail, X, CheckCircle, Send } from 'lucide-react';
 import { addTeamMembers } from '../api/teams';
 
 interface TeamSetupPageProps {
@@ -37,8 +36,6 @@ export function TeamSetupPage({ onNavigate, teamDraft, onTeamCreated }: TeamSetu
     role: 'developer',
     note: ''
   });
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -114,9 +111,6 @@ export function TeamSetupPage({ onNavigate, teamDraft, onTeamCreated }: TeamSetu
     }
   };
 
-  const handleUploadComplete = (fileName: string) => {
-    setUploadedFiles([...uploadedFiles, fileName]);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
@@ -142,13 +136,13 @@ export function TeamSetupPage({ onNavigate, teamDraft, onTeamCreated }: TeamSetu
           </div>
           <h1 className="mb-3">Team Setup</h1>
           <p className="text-muted-foreground text-lg">
-            Invite team members and upload your initial documents
+            Invite team members to get started
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="mb-8 flex justify-center">
           {/* Invite Members Card */}
-          <Card className="p-8 rounded-3xl border-border shadow-xl bg-card/50 backdrop-blur-sm">
+          <Card className="p-8 rounded-3xl border-border shadow-xl bg-card/50 backdrop-blur-sm max-w-2xl w-full">
             <h3 className="mb-6">Invite Team Members</h3>
             
             <div className="space-y-4 mb-6">
@@ -255,53 +249,6 @@ export function TeamSetupPage({ onNavigate, teamDraft, onTeamCreated }: TeamSetu
               </div>
             )}
           </Card>
-
-          {/* Upload Documents Card */}
-          <Card className="p-8 rounded-3xl border-border shadow-xl bg-card/50 backdrop-blur-sm">
-            <h3 className="mb-6">Upload Initial Documents</h3>
-            
-            <div className="space-y-4">
-              <Button
-                onClick={() => setShowUploadModal(true)}
-                variant="outline"
-                className="w-full rounded-xl gap-2 h-24 border-2 border-dashed hover:border-primary/50 hover:bg-primary/5"
-              >
-                <FileText className="w-6 h-6 text-primary" />
-                <div className="text-left">
-                  <p>Click to Upload Documents</p>
-                  <p className="text-muted-foreground text-sm">PDF, Markdown, or text files</p>
-                </div>
-              </Button>
-
-              {uploadedFiles.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Uploaded Documents ({uploadedFiles.length})</Label>
-                  <div className="space-y-2">
-                    {uploadedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-4 bg-secondary/50 rounded-xl border border-border/50"
-                      >
-                        <FileText className="w-5 h-5 text-primary flex-shrink-0" />
-                        <div className="flex-1">
-                          <p>{file}</p>
-                        </div>
-                        <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {uploadedFiles.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground bg-secondary/30 rounded-xl border border-border/50">
-                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No documents uploaded</p>
-                  <p className="text-sm">You can add them later</p>
-                </div>
-              )}
-            </div>
-          </Card>
         </div>
 
         <div className="flex gap-3">
@@ -325,17 +272,6 @@ export function TeamSetupPage({ onNavigate, teamDraft, onTeamCreated }: TeamSetu
           <p className="text-red-500 text-sm mt-4">{error}</p>
         )}
       </div>
-
-      <DocumentUploadModal 
-        open={showUploadModal} 
-        onOpenChange={(open) => {
-          setShowUploadModal(open);
-          if (!open) {
-            // Simulate upload complete
-            handleUploadComplete('Sample Document.pdf');
-          }
-        }}
-      />
     </div>
   );
 }
