@@ -1,2 +1,1 @@
-
-  # InsightHub
+# InsightHub
