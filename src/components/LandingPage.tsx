@@ -104,7 +104,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   className="rounded-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 gap-2 shadow-xl shadow-primary/30 text-lg h-14 px-8"
                   onClick={() => onNavigate('signup')}
                 >
-                  Get Started Free
+                  Get Started
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </div>
@@ -210,7 +210,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               className="rounded-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 gap-2 shadow-xl shadow-primary/30 text-lg h-14 px-10"
               onClick={() => onNavigate('signup')}
             >
-              Start Your Free Trial
+              Start Now
               <ArrowRight className="w-5 h-5" />
             </Button>
           </div>
@@ -221,47 +221,16 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       <footer className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative">
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
         <div className="max-w-7xl mx-auto px-6 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-            <div>
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl text-white">
-                  InsightHub
-                </span>
+          <div className="flex flex-col items-center gap-6 mb-12">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+                <Brain className="w-5 h-5 text-white" />
               </div>
-              <p className="text-slate-400 leading-relaxed">
-                Your team's product brain
-              </p>
+              <span className="text-xl text-white">
+                InsightHub
+              </span>
             </div>
 
-            <div>
-              <h4 className="mb-4 text-white">Product</h4>
-              <ul className="space-y-3 text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="mb-4 text-white">Company</h4>
-              <ul className="space-y-3 text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="mb-4 text-white">Support</h4>
-              <ul className="space-y-3 text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
-              </ul>
-            </div>
           </div>
 
           <div className="pt-8 border-t border-slate-700 text-center text-slate-400">

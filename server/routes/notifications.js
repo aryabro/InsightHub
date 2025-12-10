@@ -5,7 +5,6 @@ import Team from "../models/Team.js";
 
 const router = express.Router();
 
-// Helper function to create a notification
 export async function createNotification(data) {
   try {
     const notification = await Notification.create({
@@ -23,12 +22,11 @@ export async function createNotification(data) {
   }
 }
 
-// GET /api/notifications/team/:teamId - Get notifications for a team
+// GET /api/notifications/team/:teamId
 router.get("/team/:teamId", requireAuth, async (req, res) => {
   try {
     const { teamId } = req.params;
 
-    // Verify user is a member of the team
     const team = await Team.findById(teamId).lean();
     if (!team) {
       return res.status(404).json({ error: "Team not found" });
@@ -38,16 +36,15 @@ router.get("/team/:teamId", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Not authorized to view this team's notifications" });
     }
 
-    // Get notifications that haven't expired
     const notifications = await Notification.find({
       team: teamId,
-      expiresAt: { $gt: new Date() } // Only get non-expired notifications
+      expiresAt: { $gt: new Date() }
     })
       .populate('createdBy', 'fullName email')
       .populate('relatedUser', 'fullName email')
       .populate('relatedDocument', 'title fileName')
       .sort({ createdAt: -1 })
-      .limit(50) // Limit to 50 most recent
+      .limit(50)
       .lean();
 
     return res.json({
@@ -79,7 +76,7 @@ router.get("/team/:teamId", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/notifications/:id - Mark a notification as read (delete it)
+// DELETE /api/notifications/:id 
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id).lean();
@@ -88,7 +85,6 @@ router.delete("/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Notification not found" });
     }
 
-    // Verify user is a member of the team
     const team = await Team.findById(notification.team).lean();
     if (!team || !team.members.some((m) => m.toString() === req.user.id)) {
       return res.status(403).json({ error: "Not authorized" });
@@ -103,7 +99,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/notifications/cleanup - Clean up expired notifications (can be called by cron job)
+// POST /api/notifications/cleanup
 router.post("/cleanup", async (req, res) => {
   try {
     const result = await Notification.deleteMany({

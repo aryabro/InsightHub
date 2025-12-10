@@ -11,9 +11,6 @@ dotenv.config();
 const router = express.Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-/**
- * Calculate cosine similarity between two vectors
- */
 function cosineSimilarity(vecA, vecB) {
   if (vecA.length !== vecB.length) return 0;
   
@@ -31,9 +28,6 @@ function cosineSimilarity(vecA, vecB) {
   return magnitude === 0 ? 0 : dotProduct / magnitude;
 }
 
-/**
- * Find the most relevant chunks for a query within a team
- */
 async function findRelevantChunks(queryEmbedding, teamId, topK = 5) {
   // Fetch all chunks for this team
   const chunks = await DocumentChunk.find({ team: teamId })
@@ -44,21 +38,17 @@ async function findRelevantChunks(queryEmbedding, teamId, topK = 5) {
     return [];
   }
   
-  // Calculate similarity for each chunk
   const scoredChunks = chunks.map(chunk => ({
     ...chunk,
     similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
   }));
   
-  // Sort by similarity (descending) and take top K
   scoredChunks.sort((a, b) => b.similarity - a.similarity);
   
   return scoredChunks.slice(0, topK);
 }
 
-/**
- * Build context string from relevant chunks
- */
+
 function buildContext(chunks) {
   if (chunks.length === 0) return null;
   
@@ -83,13 +73,11 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Validate team access if teamId provided
     let relevantContext = null;
     let sourceDocs = [];
     let teamContext = "";
     
     if (teamId) {
-      // Verify user is a member of this team
       const team = await Team.findById(teamId)
         .populate('members', 'fullName email role timezone')
         .lean();
@@ -102,7 +90,6 @@ router.post("/", requireAuth, async (req, res) => {
         return res.status(403).json({ error: 'Not authorized to access this team\'s knowledge' });
       }
 
-      // Build Team Context
       teamContext = `
         TEAM INFORMATION:
         Name: ${team.name}
@@ -114,14 +101,11 @@ router.post("/", requireAuth, async (req, res) => {
         ${team.members.map(m => `- ${m.fullName} (${m.role || 'Member'}) - ${m.email}`).join('\n')}
         `;
       
-      // --- RAG: Find relevant context ---
       try {
         console.log('🔍 Searching for relevant documents...');
         
-        // Generate embedding for the user's question
         const queryEmbedding = await generateEmbedding(message);
         
-        // Find relevant chunks from team's documents
         const relevantChunks = await findRelevantChunks(queryEmbedding, teamId, 5);
         
         if (relevantChunks.length > 0) {
@@ -137,14 +121,11 @@ router.post("/", requireAuth, async (req, res) => {
         }
       } catch (ragError) {
         console.error('RAG search error (non-fatal):', ragError);
-        // Continue without RAG context
       }
     }
 
-    // Get the generative model
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Clean history
     const cleanHistory = history.map(msg => ({
       role: msg.type === 'user' ? 'user' : 'model',
       parts: [{ 
@@ -152,7 +133,6 @@ router.post("/", requireAuth, async (req, res) => {
       }]
     }));
 
-    // Start chat session
     const chat = model.startChat({
       history: cleanHistory,
       generationConfig: {
@@ -160,7 +140,6 @@ router.post("/", requireAuth, async (req, res) => {
       },
     });
 
-    // Build the prompt with RAG context if available
     let finalPrompt;
     if (relevantContext || teamContext) {
       finalPrompt = 
@@ -181,7 +160,6 @@ Please provide a helpful and accurate answer. If you're using information from t
 
     console.log('🔄 Sending to Gemini...');
 
-    // Send the message and get response
     const result = await chat.sendMessage(finalPrompt);
     const response = await result.response;
     const text = response.text();

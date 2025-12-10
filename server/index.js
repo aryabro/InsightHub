@@ -27,14 +27,12 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like iframes, mobile apps, etc.)
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    // Allow iframe embedding
     optionsSuccessStatus: 200
   })
 );
@@ -52,7 +50,6 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", message: "InsightHub API running" });
 });
 
-// Mongo connection & server start
 mongoose
   .connect(MONGO_URI)
   .then(() => {

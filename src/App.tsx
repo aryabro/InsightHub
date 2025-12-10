@@ -94,7 +94,6 @@ export default function App() {
     load();
   }, [isAuthenticated, currentTeam]);
 
-  // Initialize chat messages when a team is selected (if not already initialized)
   useEffect(() => {
     if (currentTeam?.id && (!chatMessages[currentTeam.id] || chatMessages[currentTeam.id].length === 0)) {
       setChatMessages(prev => ({
@@ -111,7 +110,6 @@ export default function App() {
 
   const handleNavigate = (page: string) => {
     setCurrentPage(page);
-    // Reset to about when entering the app
     if (page === 'app') {
       setActiveSection('about');
     }
@@ -128,25 +126,22 @@ export default function App() {
   };
 
   const handleSectionChange = (section: string) => {
-    // Check if user has teams
+
     const userHasTeams = myTeams.length > 0;
     
-    // If user has no teams and tries to access team sections, redirect to join-team
+
     if (!userHasTeams && ['about', 'members', 'documents', 'chat'].includes(section)) {
       setActiveSection('join-team');
       setCurrentPage('app');
       return;
     }
     
-    // Handle special navigation cases
     if (section === 'profile') {
       setCurrentPage('profile');
       setActiveSection('profile');
     } else if (section === 'create-team') {
-      // Navigate to create team page
       setCurrentPage('create-team');
     } else if (section === 'join-team') {
-      // Keep on app page but show join team in the main content
       setCurrentPage('app');
       setActiveSection('join-team');
     } else if (currentPage !== 'app' && currentPage !== 'document-detail') {
@@ -158,15 +153,11 @@ export default function App() {
   };
 
   const handleTeamJoined = async (team: any) => {
-    // Refresh teams list
     try {
       const teamsRes = await fetchMyTeams();
       setMyTeams(teamsRes?.teams || []);
-      // Set the newly joined team as current team
       setCurrentTeam(team);
-      // Save to localStorage
       localStorage.setItem('insighthub_currentTeamId', team.id);
-      // Switch to about section to show team dashboard
       setActiveSection('about');
     } catch (err) {
       console.error('Failed to refresh teams after joining', err);
@@ -177,9 +168,7 @@ export default function App() {
     const team = myTeams.find(t => t.id === teamId);
     if (team) {
       setCurrentTeam(team);
-      // Save to localStorage so it persists on refresh
       localStorage.setItem('insighthub_currentTeamId', teamId);
-      // Initialize chat messages for this team if not already exists
       if (!chatMessages[teamId] || chatMessages[teamId].length === 0) {
         setChatMessages(prev => ({
           ...prev,
@@ -191,8 +180,6 @@ export default function App() {
           }]
         }));
       }
-      // Refresh the current section to show new team's data
-      // Keep the same active section but update the team context
     }
   };
 
@@ -206,7 +193,6 @@ export default function App() {
 
   const handleNavigateToHome = () => {
     setCurrentPage('app');
-    // If user has no teams, show profile; otherwise show about
     if (myTeams.length === 0) {
       setActiveSection('profile');
     } else {
@@ -217,7 +203,6 @@ export default function App() {
   const hasTeams = myTeams.length > 0;
 
   const renderSection = () => {
-    // If user has no teams, show profile page (unless on join-team or create-team)
     if (!hasTeams && activeSection !== 'join-team' && activeSection !== 'create-team') {
       return (
         <ProfilePage 

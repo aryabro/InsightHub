@@ -7,7 +7,7 @@ type UploadDocumentPayload = {
   title: string;
   tag?: string;
   summary?: string;
-  file: File; // The actual file to upload
+  file: File; 
 };
 
 async function handleResponse(res: Response) {
@@ -37,7 +37,6 @@ export async function uploadDocument(payload: UploadDocumentPayload) {
   const res = await fetch(`${API_BASE}/api/documents`, {
     method: "POST",
     headers: {
-      // Don't set Content-Type header - let browser set it with boundary for FormData
       ...authHeader
     },
     body: formData
@@ -145,13 +144,11 @@ export async function downloadDocument(documentId: string) {
         try {
           filename = decodeURIComponent(filename);
         } catch (e) {
-          // If decoding fails, use as-is
         }
       }
     }
   }
   
-  // Ensure filename ends with .pdf
   if (!filename.toLowerCase().endsWith('.pdf')) {
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
     filename = `${nameWithoutExt}.pdf`;

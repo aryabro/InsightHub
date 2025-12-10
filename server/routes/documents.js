@@ -13,7 +13,6 @@ const { PDFParse } = require("pdf-parse");
 
 const router = express.Router();
 
-// Configure multer for memory storage (store file in memory as Buffer)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -35,7 +34,6 @@ router.post("/", requireAuth, upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "File is required" });
     }
 
-    // Validate PDF file type
     const isPDF = file.mimetype === 'application/pdf' || 
                   file.originalname.toLowerCase().endsWith('.pdf');
     
@@ -48,15 +46,12 @@ router.post("/", requireAuth, upload.single("file"), async (req, res) => {
       return res.status(404).json({ error: "Team not found" });
     }
 
-    // Only members can upload
     if (!team.members.some((m) => m.toString() === req.user.id)) {
       return res.status(403).json({ error: "Not authorized to upload to this team" });
     }
 
-    // Ensure fileName ends with .pdf extension
     let fileName = file.originalname;
     if (!fileName.toLowerCase().endsWith('.pdf')) {
-      // Remove existing extension and add .pdf
       const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
       fileName = `${nameWithoutExt}.pdf`;
     }
@@ -66,34 +61,30 @@ router.post("/", requireAuth, upload.single("file"), async (req, res) => {
       title,
       tag,
       summary,
-      fileName: fileName, // Store with .pdf extension
+      fileName: fileName, 
       fileSize: file.size,
-      fileContent: file.buffer, // Store the actual file content
-      mimeType: 'application/pdf', // Force PDF MIME type
+      fileContent: file.buffer, 
+      mimeType: 'application/pdf', 
       uploadedBy: req.user.id
     });
 
-    // --- RAG: Extract text from PDF and create embeddings ---
     try {
       console.log(`📄 Processing PDF for RAG: ${title}`);
       
-      // Parse PDF to extract text
+
       const parser = new PDFParse({ data: file.buffer });
       const pdfResult = await parser.getText();
       const extractedText = pdfResult.text;
-      
-      // Clean up parser resources
+
       await parser.destroy();
       
       if (extractedText && extractedText.trim().length > 0) {
         console.log(`📝 Extracted ${extractedText.length} characters from PDF`);
         
-        // Process text into chunks with embeddings
         const chunksWithEmbeddings = await processTextToChunks(extractedText);
         
         console.log(`🔢 Generated ${chunksWithEmbeddings.length} chunks with embeddings`);
         
-        // Save chunks to database
         if (chunksWithEmbeddings.length > 0) {
           const chunkDocs = chunksWithEmbeddings.map(chunk => ({
             document: doc._id,
@@ -110,12 +101,9 @@ router.post("/", requireAuth, upload.single("file"), async (req, res) => {
         console.log(`⚠️ No text extracted from PDF: ${title}`);
       }
     } catch (ragError) {
-      // Log error but don't fail the upload - RAG is a bonus feature
       console.error("RAG processing error (non-fatal):", ragError);
     }
-    // --- End RAG processing ---
 
-    // Create notification for document upload
     await createNotification({
       team: teamId,
       type: 'document_uploaded',
@@ -140,7 +128,7 @@ router.post("/", requireAuth, upload.single("file"), async (req, res) => {
   }
 });
 
-// GET /api/documents/team/:teamId - MUST come before /:id
+// GET /api/documents/team/:teamId - 
 router.get("/team/:teamId", requireAuth, async (req, res) => {
   try {
     const { teamId } = req.params;
@@ -150,7 +138,6 @@ router.get("/team/:teamId", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Team not found" });
     }
 
-    // Check if user is a member
     if (!team.members.some((m) => m.toString() === req.user.id)) {
       return res.status(403).json({ error: "Not authorized to view this team's documents" });
     }
@@ -184,7 +171,7 @@ router.get("/team/:teamId", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/documents/recent - MUST come before /:id
+// GET /api/documents/recent
 router.get("/recent", requireAuth, async (req, res) => {
   try {
     const limit = Number(req.query.limit) || 5;
@@ -218,9 +205,7 @@ router.get("/recent", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/documents/:id/preview - Preview PDF in browser (inline)
-// Supports both Authorization header and token query param (for iframe)
-// Handle OPTIONS request for CORS preflight
+// GET /api/documents/:id/preview
 router.options("/:id/preview", (req, res) => {
   const origin = req.headers.origin || req.headers.referer?.split('/').slice(0, 3).join('/') || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
@@ -231,12 +216,9 @@ router.options("/:id/preview", (req, res) => {
 });
 
 router.get("/:id/preview", (req, res, next) => {
-  // Check for token in query param first (for iframe usage)
   if (req.query.token) {
-    // Temporarily set Authorization header from query param
     req.headers.authorization = `Bearer ${req.query.token}`;
   }
-  // Use requireAuth middleware
   requireAuth(req, res, next);
 }, async (req, res) => {
   try {
@@ -254,12 +236,10 @@ router.get("/:id/preview", (req, res, next) => {
       return res.status(404).json({ error: "Team not found" });
     }
 
-    // Check if user is a member
     if (!team.members.some((m) => m.toString() === req.user.id)) {
       return res.status(403).json({ error: "Not authorized to view this document" });
     }
 
-    // If file content exists, serve it inline for preview
     if (doc.fileContent && doc.fileContent.length > 0) {
       const fileBuffer = Buffer.isBuffer(doc.fileContent) 
         ? doc.fileContent 
@@ -271,18 +251,15 @@ router.get("/:id/preview", (req, res, next) => {
         fileName = `${nameWithoutExt}.pdf`;
       }
       
-      // Set headers for inline display (preview)
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
       res.setHeader('Content-Length', fileBuffer.length);
       
-      // Allow CORS for iframe - set to the origin making the request
       const origin = req.headers.origin || req.headers.referer?.split('/').slice(0, 3).join('/') || '*';
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-      // Don't set X-Frame-Options - let browser handle it naturally for same-origin
       
       return res.end(fileBuffer);
     }
@@ -294,11 +271,10 @@ router.get("/:id/preview", (req, res, next) => {
   }
 });
 
-// GET /api/documents/:id/download - MUST come before /:id
+// GET /api/documents/:id/download
 router.get("/:id/download", requireAuth, async (req, res) => {
   try {
-    // Don't use .lean() here - we need the full document with fileContent
-    // Explicitly select fileContent to ensure it's included
+    
     const doc = await Document.findById(req.params.id)
       .select('+fileContent') // Explicitly include fileContent
       .populate('uploadedBy', 'fullName email');
@@ -312,38 +288,30 @@ router.get("/:id/download", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Team not found" });
     }
 
-    // Check if user is a member
     if (!team.members.some((m) => m.toString() === req.user.id)) {
       return res.status(403).json({ error: "Not authorized to download this document" });
     }
 
-    // If file content exists, serve it
     if (doc.fileContent && doc.fileContent.length > 0) {
-      // Ensure fileContent is a Buffer
       const fileBuffer = Buffer.isBuffer(doc.fileContent) 
         ? doc.fileContent 
         : Buffer.from(doc.fileContent);
       
-      // Ensure filename ends with .pdf
       let fileName = doc.fileName || doc.title;
       if (!fileName.toLowerCase().endsWith('.pdf')) {
         const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
         fileName = `${nameWithoutExt}.pdf`;
       }
       
-      // Set proper headers for binary file download
-      res.setHeader('Content-Type', 'application/pdf'); // Always PDF
-      // Use both filename (for compatibility) and filename* (RFC 5987 for special chars)
-      // Escape quotes in filename for the header
+      res.setHeader('Content-Type', 'application/pdf');
+
       const safeFileName = fileName.replace(/"/g, '\\"');
       res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
       res.setHeader('Content-Length', fileBuffer.length);
       
-      // Send binary data - use end() to ensure binary encoding
       return res.end(fileBuffer);
     }
 
-    // Fallback: if no file content, create a text file with metadata
     const content = `Document: ${doc.title}
 ${doc.tag ? `Type: ${doc.tag}` : ''}
 ${doc.summary ? `\nSummary:\n${doc.summary}` : ''}
@@ -364,7 +332,7 @@ Note: File content not available.
   }
 });
 
-// GET /api/documents/:id - MUST come after /team/:teamId, /recent, and /:id/download
+// GET /api/documents/:id 
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await Document.findById(req.params.id)
@@ -380,12 +348,10 @@ router.get("/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Team not found" });
     }
 
-    // Check if user is a member
     if (!team.members.some((m) => m.toString() === req.user.id)) {
       return res.status(403).json({ error: "Not authorized to view this document" });
     }
 
-    // Increment view count
     await Document.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
 
     return res.json({
@@ -427,14 +393,12 @@ router.delete("/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Team not found" });
     }
 
-    // Only team creator can delete documents
     if (team.createdBy.toString() !== req.user.id) {
       return res.status(403).json({ error: "Only team creator can delete documents" });
     }
 
     await Document.findByIdAndDelete(req.params.id);
     
-    // Also delete associated chunks for RAG
     await DocumentChunk.deleteMany({ document: req.params.id });
 
     return res.json({ success: true });
